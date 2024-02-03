@@ -8,12 +8,13 @@ import numpy as np
 def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
     """Simple implementation of Q-Learning"""
 
-    learning_rate = 0.1
-    gamma = 0.99
-    num_episodes = 50_000
+    learning_rate = 0.2
+    gamma = 0.995
+    num_episodes = 30_000
     epsilon_start = 0.8
     epsilon_end = 0.01
     eps_factor = (epsilon_start - epsilon_end) / (num_episodes / 2)
+    lr_step = (learning_rate - 0.01) / num_episodes
 
     states = list(range(0, grid_size**2))
 
@@ -21,7 +22,7 @@ def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
     value_table = {}                                    # Will be a dict of {f"{s},{a}": value}}
     for s in states:
         for a in range(grid_size):
-            value_table[f"{s},{a}"] = 0
+            value_table[(s, a)] = 1
     policy = {}
     for s in states:
         policy[s] = np.random.choice(4)
@@ -37,46 +38,46 @@ def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
 
         current_state = env.reset()[0]
 
-        eps = epsilon_start - eps_factor * episode_count
+        eps = epsilon_start - eps_factor * episode_count        # Reducing epsilon necessary for convergence
+        learning_rate -= lr_step                                # Necessary to reduce learning rate over time
 
         while True:
             # Get an e-greedy action
             if np.random.rand() < eps:
                 action = np.random.choice(4)
             else:
-                action = policy[current_state]
+                action = get_max_value_action(value_table, current_state)
 
             new_state, reward, terminated, truncated, _ = env.step(action)
 
             if terminated or truncated:
-                value_table[f"{current_state},{action}"] = (
-                        value_table[f"{current_state},{action}"] + learning_rate *
-                        (reward - value_table[f"{current_state},{action}"])
+                value_table[(current_state, action)] = (
+                        value_table[(current_state, action)] + learning_rate *
+                        (reward - value_table[(current_state, action)])
                 )
                 break
 
             else:
-                value_table[f"{current_state},{action}"] = (
-                        value_table[f"{current_state},{action}"] + learning_rate * (
+                value_table[(current_state, action)] = (
+                        value_table[(current_state, action)] + learning_rate * (
                             reward + gamma * get_max_next_value(value_table, new_state) -
-                            value_table[f"{current_state},{action}"]
+                            value_table[(current_state, action)]
                         ))
 
             current_state = new_state
+        episode_count += 1
 
-        # Update the policy
+        # Update the policy for use later
         for s in states:
             best_action = get_max_value_action(value_table, s)
             policy[s] = best_action
 
-        episode_count += 1
-
     return policy
 
 
-def get_max_value_action(value_table: dict[str], state: int) -> int:
+def get_max_value_action(value_table: dict[tuple[int, int], int], state: int) -> int:
     """Get the action with the largest value from the options available in the given state"""
-    state_action = [f"{s},{a}" for s, a in zip([state] * 4, range(4))]
+    state_action = [(s, a) for s, a in zip([state] * 4, range(4))]
     vals = [value_table[sa] for sa in state_action]
     # Where all vals are the same there is no clear policy so choose a random action.
     # If we don't do this, argmax will always choose 0 (left) which is not helpful.
@@ -85,9 +86,9 @@ def get_max_value_action(value_table: dict[str], state: int) -> int:
     return np.argmax(vals)
 
 
-def get_max_next_value(value_table: dict[str], state: int) -> float:
+def get_max_next_value(value_table: dict[tuple[int, int], int], state: int) -> float:
     """Get the max value of the next state action pair from the options available"""
-    state_action = [f"{s},{a}" for s, a in zip([state] * 4, range(4))]
+    state_action = [(s, a) for s, a in zip([state] * 4, range(4))]
     return max([value_table[sa] for sa in state_action])
 
 
@@ -130,7 +131,7 @@ def main():
 
 def test_get_max_next_value():
     """Unit test for get_max_next_value"""
-    value_table = {"0,0": 1, "0,1": 2, "0,2": 3, "0,3": 4}
+    value_table = {(0, 0): 1, (0, 1): 2, (0, 2): 3, (0, 3): 4}
     assert get_max_next_value(value_table, 0) == 4
 
 
