@@ -1,4 +1,4 @@
-"""Q-learning model to operate on the gymnasium toy-text frozen-lake environment"""
+"""SARSA model to operate on the gymnasium toy-text frozen-lake environment"""
 
 import gymnasium as gym
 from gymnasium.envs.toy_text.frozen_lake import generate_random_map
@@ -6,9 +6,8 @@ import numpy as np
 
 from learning_common import *
 
-
-def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
-    """Simple implementation of Q-Learning"""
+def sarsa(env, grid_size: int, world: list) -> dict[int:int]:
+    """Simple implementation of SARSA"""
 
     learning_rate = 0.2
     gamma = 0.995
@@ -21,7 +20,7 @@ def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
     states = list(range(0, grid_size**2))
 
     # Set up the value table and the random starting policy
-    value_table = {}                                    # Will be a dict of {f"{s},{a}": value}}
+    value_table = {}                                    # Will be a dict of {(s,a): value}}
     for s in states:
         for a in range(grid_size):
             value_table[(s, a)] = 1
@@ -43,12 +42,14 @@ def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
         eps = epsilon_start - eps_factor * episode_count        # Reducing epsilon necessary for convergence
         learning_rate -= lr_step                                # Necessary to reduce learning rate over time
 
+        # Get the first SARSA action under e-greedy policy
+        if np.random.rand() < eps:
+            action = np.random.choice(4)
+        else:
+            action = get_max_value_action(value_table, current_state)
+
+        # Episode loop
         while True:
-            # Get an e-greedy action
-            if np.random.rand() < eps:
-                action = np.random.choice(4)
-            else:
-                action = get_max_value_action(value_table, current_state)
 
             new_state, reward, terminated, truncated, _ = env.step(action)
 
@@ -60,10 +61,15 @@ def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
                 break
 
             else:
+                # SARSA action policy must be the same as the first action selection (e-greedy)
+                if np.random.rand() < eps:
+                    action = np.random.choice(4)
+                else:
+                    action = get_max_value_action(value_table, current_state)
+                target_action_value = value_table[(new_state, action)]
                 value_table[(current_state, action)] = (
                         value_table[(current_state, action)] + learning_rate * (
-                            reward + gamma * get_max_next_value(value_table, new_state) -
-                            value_table[(current_state, action)]
+                            reward + gamma * target_action_value - value_table[(current_state, action)]
                         ))
 
             current_state = new_state
@@ -92,12 +98,12 @@ def test_policy(world, policy):
 
 def main():
     """Set up the world and try to learn"""
-    grid_size = 8
+    grid_size = 5
     world = generate_random_map(size=grid_size)
     print(f"Let's learn this new ice world!\n{print_world(world)}\n")
 
     env = gym.make('FrozenLake-v1', desc=world, is_slippery=True)
-    the_policy = q_learning(env, grid_size, world)
+    the_policy = sarsa(env, grid_size, world)
 
     print(f"The world we learnt on is: ")
     print_world(world)
@@ -114,6 +120,12 @@ def test_get_max_next_value():
     """Unit test for get_max_next_value"""
     value_table = {(0, 0): 1, (0, 1): 2, (0, 2): 3, (0, 3): 4}
     assert get_max_next_value(value_table, 0) == 4
+
+
+def test_print_policy():
+    """Unit test for print_policy"""
+    policy = {0: 2, 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2, 9: 2, 10: 3, 11: 2, 12: 1, 13: 0, 14: 2, 15: 3, 16: 2, 17: 0, 18: 2, 19: 2, 20: 0, 21: 0, 22: 0, 23: 1, 24: 2}
+    print_policy(policy, 5)
 
 
 if __name__ == "__main__":
