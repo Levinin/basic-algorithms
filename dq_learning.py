@@ -22,15 +22,14 @@ def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
     value_table_a = {}
     value_table_b = {}
     count_table = {}  # To keep track of how many times we've visited a state-action pair
-    policy_a = {}
-    policy_b = {}
+    policy = {}
+
     for s in states:
         for a in range(grid_size):
             value_table_a[(s, a)] = 1       # Optimistic initialisation
             value_table_b[(s, a)] = 1       # Optimistic initialisation
             count_table[(s, a)] = 1
-        policy_a[s] = np.random.choice(num_actions)
-        policy_b[s] = np.random.choice(num_actions)
+        policy[s] = np.random.choice(num_actions)
 
     # Training loop
     episode_count = 0
@@ -40,7 +39,7 @@ def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
             print(f"Starting episode: {episode_count}")
         if (episode_count - 1) % 10000 == 0 and episode_count > 1000:
             print(f"Rendering policy at episode {episode_count}.")
-            policy_test(world, policy_a)
+            policy_test(world, policy)
 
         current_state = env.reset()[0]
 
@@ -82,9 +81,9 @@ def q_learning(env, grid_size: int, world: list) -> dict[int:int]:
         # Update the policy for use later
         for s in states:
             best_action = get_max_value_action(value_table_a, s, value_table_b)
-            policy_a[s] = best_action
+            policy[s] = best_action
 
-    return policy_a
+    return policy
 
 
 def policy_test(world, policy):
